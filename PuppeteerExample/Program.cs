@@ -8,6 +8,7 @@ namespace PuppeteerExample
     class Program
     {
         private static NavigationOptions _navigationOptions = new NavigationOptions { WaitUntil = new WaitUntilNavigation[] { WaitUntilNavigation.Networkidle0 } };
+        private static object hyperlinkText;
 
         static async Task Main(string[] args)
         {
@@ -17,15 +18,16 @@ namespace PuppeteerExample
               PuppeteerExample\PuppeteerExample\bin\Debug\netcoreapp3.1\.local-chromium\Win64-706915\chrome-win
               The default.htm file is currently in the csproj folder
             *****************************************************************/
-            const string url = "file:///default.htm";
+            ////const string url = "file:///default.htm";
+            const string url = "https://matluspub.blob.core.windows.net/public/default.htm";
             await new BrowserFetcher().DownloadAsync(BrowserFetcher.DefaultRevision);
             var browser = await Puppeteer.LaunchAsync(new LaunchOptions
             {
                 Headless = false,
-                DefaultViewport = null                
+                DefaultViewport = null
             });
 
-            var delay = 100;            
+            var delay = 100;
             var page = await browser.NewPageAsync();
             page.Request += Page_Request;
             page.Response += Page_Response;
@@ -49,7 +51,7 @@ namespace PuppeteerExample
             await TypeFieldValue(page, addressSelector, "6963 Gillis Way", delay);
 
             await SetDropdownValue(page, "country", "ISO 3166-2:US");
-            
+
             await SetDropdownValue(page, "state", "VA");
 
             var zipSelector = "#zip";
@@ -61,7 +63,7 @@ namespace PuppeteerExample
 
             /// Save Information checkbox
             await page.ClickAsync("#save-info");
-            await page.Keyboard.PressAsync("Tab");            
+            await page.Keyboard.PressAsync("Tab");
 
             /// PayPal radio button
             await page.ClickAsync("#paypal");
@@ -88,7 +90,8 @@ namespace PuppeteerExample
 
         private static async Task MatlusWebsiteOperations(Page page)
         {
-            await ClickLinkWithSelectorAndWaitForSelector(page, "a[data-pageno=\"2\"]", "a[data-pageno=\"1\"]");
+            await ClickElementWithXPathAndWaitForXPath(page, "//a[text()='2']", "//a[text()='1']");
+            ////await ClickLinkWithSelectorAndWaitForSelector(page, "a[data-pageno=\"2\"]", "a[data-pageno=\"1\"]");
             await ClickHyperlinkWithText(page, "A Generic RESTful CRUD HttpClient");
         }
 
@@ -120,30 +123,39 @@ namespace PuppeteerExample
         }
 
         private static async Task ClickHyperlinkWithText(Page page, string hyperlinkText)
-        {
-            var navigationTask = page.WaitForNavigationAsync(_navigationOptions);
-            try
+        {            
+            var aElementsWithRestful = await page.XPathAsync($"//a[contains(text(), '{hyperlinkText}')]");
+            if (aElementsWithRestful.Length == 1)
             {
-                var aElementsWithRestful = await page.XPathAsync($"//a[contains(., '{hyperlinkText}')]");
-                if (aElementsWithRestful.Length == 1)
-                {
-                    await aElementsWithRestful[0].ClickAsync();
-                }
-                else
-                {
-                    throw new Exception($"A hyperlink with the text: {hyperlinkText} was not found");
-                }
+                var navigationTask = page.WaitForNavigationAsync(_navigationOptions);
+                var clickTask = aElementsWithRestful[0].ClickAsync();
+                await Task.WhenAll(navigationTask, clickTask);
             }
-            finally
+            else
             {
-                await Task.WhenAll(navigationTask);
+                throw new Exception($"A hyperlink with the text: {hyperlinkText} was not found");
             }            
         }
 
         private static async Task ClickLinkWithSelectorAndWaitForSelector(Page page, string linkSelector, string waitForSelector)
         {
-            await page.ClickAsync(linkSelector);            
+            await page.ClickAsync(linkSelector);
             await page.WaitForSelectorAsync($"{ waitForSelector}");
+        }
+
+        private static async Task ClickElementWithXPathAndWaitForXPath(Page page, string clickOnXpathExpression, string waitForXpathExpression)
+        {
+            var aElementsWithRestful = await page.XPathAsync(clickOnXpathExpression);
+            if (aElementsWithRestful.Length == 1)
+            {
+                var navigationTask = page.WaitForXPathAsync(waitForXpathExpression);
+                var clickTask = aElementsWithRestful[0].ClickAsync();
+                await Task.WhenAll(navigationTask, clickTask);
+            }
+            else
+            {
+                throw new Exception($"A hyperlink with expression: {clickOnXpathExpression} was not found");
+            }
         }
     }
 }
